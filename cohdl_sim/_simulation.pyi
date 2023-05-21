@@ -63,6 +63,22 @@ class Simulator:
         """
         wait until signal becomes falsy
         """
+    async def true_on_rising(
+        self, clk: Signal[Bit], cond, *, timeout: int | None = None
+    ):
+        """
+        wait until cond is true after a rising edge of the clock signal
+        cond can be a port or a callable taking no arguments returning a boolean value
+        raises an exception if the condition remains false for more than timeout rising edges
+        """
+    async def true_on_falling(
+        self, clk: Signal[Bit], cond, *, timeout: int | None = None
+    ):
+        """
+        wait until cond is true after a falling edge of the clock signal
+        cond can be a port or a callable taking no arguments returning a boolean value
+        raises an exception if the condition remains false for more than timeout falling edges
+        """
     async def start(self, coro):
         """
         run coro in parallel task

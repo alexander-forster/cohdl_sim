@@ -1,4 +1,4 @@
-from cohdl import Bit, BitVector, Signal, Port
+from cohdl import Bit, BitVector, Signed, Unsigned, Signal, Port
 
 from cocotb.handle import Freeze, Release
 from cocotb.triggers import RisingEdge, FallingEdge, Edge, ClockCycles
@@ -22,12 +22,25 @@ def load_all(*args):
             arg._load()
 
 
+_prev_property = None
+
+
 class ProxyPort:
-    def __init__(self, entity_port: Signal[BitVector], cocotb_port, is_root=True):
+    def __init__(
+        self,
+        entity_port: Signal[BitVector],
+        cocotb_port,
+        is_root=True,
+        uid: int | None = None,
+    ):
         self._val = Port.decay(entity_port)
         self._type = type(self._val)
         self._root = is_root
         self._cocotb_port = cocotb_port
+        self._uid = id(self) if uid is None else uid
+
+    def __call__(self):
+        return self
 
     def _is_root(self):
         return self._root
@@ -48,6 +61,69 @@ class ProxyPort:
             self._cocotb_port.value = bool(self._val)
         else:
             self._cocotb_port.value = self._val.unsigned.to_int()
+
+    @property
+    def signed(self):
+        global _prev_property
+        assert issubclass(self._type, BitVector)
+
+        if issubclass(self._type, Signed):
+            _prev_property = self
+            return self
+
+        result = ProxyPort(self._val.signed, self._cocotb_port, False, self._uid)
+        result._load = self._load
+        result._store = self._store
+        _prev_property = result
+        return result
+
+    @signed.setter
+    def signed(self, value):
+        assert (
+            value._uid is self._uid
+        ), "direct assignment to .signed property not allowed use '<<=' operator"
+
+    @property
+    def unsigned(self):
+        global _prev_property
+        assert issubclass(self._type, BitVector)
+
+        if issubclass(self._type, Unsigned):
+            _prev_property = self
+            return self
+
+        result = ProxyPort(self._val.unsigned, self._cocotb_port, False, self._uid)
+        result._load = self._load
+        result._store = self._store
+        _prev_property = result
+        return result
+
+    @unsigned.setter
+    def unsigned(self, value):
+        assert (
+            value._uid is self._uid
+        ), "direct assignment to .unsigned property not allowed use '<<=' operator"
+
+    @property
+    def bitvector(self):
+        global _prev_property
+        assert issubclass(self._type, BitVector)
+
+        if not issubclass(self._type, (Signed, Unsigned)):
+            _prev_property = self
+            return self
+
+        result = ProxyPort(self._val.bitvector, self._cocotb_port, False, self._uid)
+        result._load = self._load
+        result._store = self._store
+        _prev_property = result
+        return result
+
+    @bitvector.setter
+    def bitvector(self, value):
+        assert (
+            value._uid is self._uid
+        ), "direct assignment to .bitvector property not allowed use '<<=' operator"
 
     def __getitem__(self, arg):
         assert issubclass(self._type, BitVector)
@@ -73,6 +149,9 @@ class ProxyPort:
         pass
 
     def __ilshift__(self, src):
+        if isinstance(src, ProxyPort):
+            src = src._val
+
         self._val._assign(src)
         self._store()
         return self

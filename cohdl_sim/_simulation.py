@@ -119,6 +119,18 @@ class Simulator:
         while signal:
             await signal._edge()
 
+    async def true_on_rising(self, clk: ProxyPort, cond, *, timeout=None):
+        while True:
+            await self.rising_edge(clk)
+            if cond():
+                return
+
+    async def true_on_falling(self, clk: ProxyPort, cond, *, timeout=None):
+        while True:
+            await self.falling_edge(clk)
+            if cond():
+                return
+
     def start(self, coro):
         cocotb.start(coro)
 
