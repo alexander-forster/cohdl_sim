@@ -1,4 +1,4 @@
-from cohdl import Bit, BitVector, Signed, Unsigned, Signal, Port
+from cohdl import Bit, BitVector, Signed, Unsigned, Signal, Port, TypeQualifierBase
 
 from cocotb.handle import Freeze, Release
 from cocotb.triggers import RisingEdge, FallingEdge, Edge, ClockCycles
@@ -10,10 +10,7 @@ def to_cocotb(cohdl_val):
     return cohdl_val.unsigned.to_int()
 
 
-def decay(val):
-    if isinstance(val, ProxyPort):
-        return decay(val._val)
-    return Port.decay(val)
+decay = TypeQualifierBase.decay
 
 
 def load_all(*args):
@@ -25,7 +22,7 @@ def load_all(*args):
 _prev_property = None
 
 
-class ProxyPort:
+class ProxyPort(TypeQualifierBase):
     def __init__(
         self,
         entity_port: Signal[BitVector],
@@ -38,6 +35,9 @@ class ProxyPort:
         self._root = is_root
         self._cocotb_port = cocotb_port
         self._uid = id(self) if uid is None else uid
+
+    def decay(self):
+        return Port.decay(self._val)
 
     def __call__(self):
         return self
@@ -61,6 +61,10 @@ class ProxyPort:
             self._cocotb_port.value = bool(self._val)
         else:
             self._cocotb_port.value = self._val.unsigned.to_int()
+
+    def copy(self):
+        self._load()
+        return self._val.copy()
 
     @property
     def signed(self):
@@ -355,3 +359,6 @@ class ProxyPort:
                 await self._edge()
 
         return gen().__await__()
+
+    def resize(self, *args, **kwargs):
+        return decay(self).resize(*args, **kwargs)
