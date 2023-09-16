@@ -1,0 +1,10 @@
+[project]
+name="cohdl_sim"
+authors = [
+    { name = "Alexander Forster", email = "alexander.forster123@gmail.com" }
+]
+description="Simulation support library for CoHDL, based on cocotb"
+version="0.1"
+
+[tool.setuptools.packages.find]
+exclude = ["examples"]
