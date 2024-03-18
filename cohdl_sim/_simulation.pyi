@@ -26,77 +26,92 @@ class Simulator:
 
         The other arguments are forwarded to cocotb_test.simulator.run().
         """
+
     async def wait(self, duration: std.Duration):
         """
         wait for a given simulation duration
         """
+
     async def delta_step(self):
         """
         run simulation for a short time to update output ports
         """
+
     async def rising_edge(self, signal: Signal[Bit]):
         """
         wait for rising edge on signal
         """
+
     async def falling_edge(self, signal: Signal[Bit]):
         """
         wait for falling edge on signal
         """
+
     async def any_edge(self, signal: Signal[Bit]):
         """
         wait for changes of signal
         """
+
     async def clock_cycles(self, signal: Signal[Bit], num_cycles: int, rising=True):
         """
         wait for a number of clock cycles,
         rising determines whether rising or falling edges are counted
         """
+
     async def value_change(self, signal: Signal):
         """
         wait until signal changes
         """
+
     async def value_true(self, signal: Signal):
         """
         wait until signal becomes truthy
         """
+
     async def value_false(self, signal: Signal):
         """
         wait until signal becomes falsy
         """
+
     async def true_on_rising(
         self, clk: Signal[Bit], cond, *, timeout: int | None = None
     ):
         """
-        wait until cond is true after a rising edge of the clock signal
-        cond can be a port or a callable taking no arguments returning a boolean value
-        raises an exception if the condition remains false for more than timeout rising edges
+        Wait until cond is true after a rising edge of the clock signal.
+        `cond` can be a port or a callable taking no arguments returning a boolean value.
+        Raises an exception if the condition remains false for more than timeout rising edges.
         """
+
     async def true_on_falling(
         self, clk: Signal[Bit], cond, *, timeout: int | None = None
     ):
         """
-        wait until cond is true after a falling edge of the clock signal
-        cond can be a port or a callable taking no arguments returning a boolean value
-        raises an exception if the condition remains false for more than timeout falling edges
+        Wait until cond is true after a falling edge of the clock signal.
+        `cond` can be a port or a callable taking no arguments returning a boolean value.
+        Raises an exception if the condition remains false for more than timeout falling edges.
         """
+
     async def start(self, coro):
         """
-        run coro in parallel task
-        coro will start immediately (current task is suspended)
+        Run coro in parallel task.
+        `coro` will start immediately (current task is suspended).
         """
+
     def start_soon(self, coro):
         """
-        run coro in parallel task
-        coro will start once the current task is suspended
+        Run coro in parallel task.
+        `coro` will start once the current task is suspended.
         """
+
     @overload
     def gen_clock(
-        self, clk: Signal[Bit], period: std.Period, start_state=False
+        self, clk: Signal[Bit], period: std.Duration, start_state=False
     ) -> None:
         """
-        start a parallel task that produces a clock signal
-        with the specified period or frequency on clk
+        Start a parallel task that produces a clock signal
+        with the specified period or frequency on `clk`.
         """
+
     @overload
     def gen_clock(
         self, clk: Signal[Bit], frequency: std.Frequency, start_state=False
@@ -105,15 +120,18 @@ class Simulator:
         """
         return the cocotb design under test object
         """
+
     def test(self, testbench):
         """
         decorator turns coroutines into test benches
         """
         return testbench
+
     def freeze(self, port: Signal):
         """
         freeze the signal in its current state
         """
+
     def release(self, port: Signal):
         """
         release a frozen signal
