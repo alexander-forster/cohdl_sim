@@ -103,19 +103,18 @@ class Simulator:
         `coro` will start once the current task is suspended.
         """
 
-    @overload
     def gen_clock(
-        self, clk: Signal[Bit], period: std.Duration, start_state=False
+        self,
+        clk: Signal[Bit],
+        period_or_frequency: std.Duration | std.Frequency,
+        /,
+        start_state=False,
     ) -> None:
         """
         Start a parallel task that produces a clock signal
         with the specified period or frequency on `clk`.
         """
 
-    @overload
-    def gen_clock(
-        self, clk: Signal[Bit], frequency: std.Frequency, start_state=False
-    ) -> None: ...
     def get_dut(self):
         """
         return the cocotb design under test object

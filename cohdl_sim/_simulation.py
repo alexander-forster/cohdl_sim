@@ -147,9 +147,11 @@ class Simulator:
     def start_soon(self, coro):
         cocotb.start_soon(coro)
 
-    def gen_clock(self, clk, period: std.Duration, start_state=False):
-        if isinstance(period, std.Frequency):
-            period = period.period()
+    def gen_clock(
+        self, clk, period_or_frequency: std.Duration = None, /, start_state=False
+    ):
+        if isinstance(period_or_frequency, (std.Frequency, std.Duration)):
+            period = period_or_frequency.period()
 
         half = int(period.picoseconds()) // 2
 

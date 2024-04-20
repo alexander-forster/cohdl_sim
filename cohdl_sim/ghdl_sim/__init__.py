@@ -9,6 +9,8 @@ It cannot be combined with cocotb libraries.
 The main advantage is, that the entire simulation is performed
 in a single Python context. Debuggers can be used to step threw
 testbench code without additional setup.
+Unlike the cocotb backend the direct GHDL access is usable from
+jupyter notebooks.
 """
 
 import os

@@ -29,7 +29,9 @@ class MyEntity(Entity):
 sim = Simulator(MyEntity)
 
 
-# mark coroutines with sim.test to turn them into test benches
+# Mark coroutines with sim.test to turn them into test benches.
+# The given argument is a proxy object based on the tested entity
+# Port assignments and reads are forwarded to the simulator.
 @sim.test
 async def testbench_1(entity: MyEntity):
     # cohdl_sim is a wrapper around cocotb

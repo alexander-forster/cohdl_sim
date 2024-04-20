@@ -37,7 +37,14 @@ def l(x):
 
 
 class Simulator:
-    def __init__(self, entity: type[Entity], *, build_dir: str = "build", mkdir=True):
+    def __init__(
+        self,
+        entity: type[Entity],
+        *,
+        build_dir: str = "build",
+        mkdir=True,
+        sim_args=None,
+    ):
         build_dir = Path(build_dir)
 
         if not os.path.exists(build_dir):
@@ -62,9 +69,13 @@ class Simulator:
 
         self._top_name = top_name
         self._sim = GhdlInterface()
+        self._sim_args = sim_args if sim_args is not None else []
 
         self._tb = None
         self._current_coro = None
+
+    def port_names(self) -> list[str]:
+        return [name for name in self._entity._info.ports]
 
     def _initial_fn(self):
         entity_name = self._entity.__name__
@@ -109,16 +120,18 @@ class Simulator:
 
         self._current_coro = prev_coro
 
-    def test(self, testbench):
+    def test(self, testbench, sim_args=None):
         async def tb_wrapper(entity):
             await testbench(entity)
             self._sim.finish_simulation()
+
+        sim_args = sim_args if sim_args is not None else self._sim_args
 
         self._tb = tb_wrapper
         self._sim.cleanup()
 
         global_alive_list.append(self._sim.add_startup_function(self._startup_function))
-        self._sim.start(str(self._simlib), ["--wave=wave.ghw"])
+        self._sim.start(str(self._simlib), sim_args)
         self._sim.stop()
 
     async def _wait_picoseconds(self, picos: int):

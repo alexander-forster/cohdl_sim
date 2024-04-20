@@ -1,7 +1,6 @@
 import os
 import shutil
 import subprocess
-import contextlib
 from pathlib import Path
 
 
@@ -36,7 +35,10 @@ def prepare_ghdl_simulation(
         else:
             assert Path(source_path).parent == build_dir
 
-    with contextlib.chdir(build_dir):
+    curdir = os.curdir
+
+    try:
+        os.chdir(build_dir)
         run_command("ghdl-gcc", "-a", *vhdl_names)
         run_command("ghdl-gcc", "--bind", top_module)
         list_link = run_command("ghdl-gcc", "--list-link", top_module).split()
@@ -71,3 +73,5 @@ def prepare_ghdl_simulation(
         run_command("gcc", *list_link, "-Wl,-shared,-fPIC", f"-o{out_name}")
 
         return Path(out_name).absolute()
+    finally:
+        os.chdir(curdir)
