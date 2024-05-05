@@ -10,6 +10,14 @@ description="Simulation support library for CoHDL, based on cocotb"
 readme = "README.md"
 requires-python = ">= 3.10"
 
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License"
+]
+
+[project.urls]
+Homepage = "https://github.com/alexander-forster/cohdl_sim"
+
 dependencies = [
     "cohdl",
     "cocotb",
