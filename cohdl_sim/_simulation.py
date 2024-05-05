@@ -8,7 +8,7 @@ from cocotb.triggers import (
 
 from cocotb_test import simulator as cocotb_simulator
 
-from cohdl import Entity
+from cohdl import Entity, Port, BitVector, Signed, Unsigned
 from cohdl import std
 
 from ._proxy_port import ProxyPort
@@ -25,6 +25,7 @@ class Simulator:
         sim_dir: str = "sim",
         vhdl_dir: str = "vhdl",
         mkdir: bool = True,
+        cast_vectors=None,
         extra_env: dict[str, str] | None = None,
         **kwargs,
     ):
@@ -85,6 +86,7 @@ class Simulator:
 
             self._entity = entity
             self._dut = None
+            self._port_bv = cast_vectors
 
     async def wait(self, duration: std.Duration):
         await Timer(int(duration.picoseconds()), units="ps")
@@ -191,6 +193,22 @@ class Simulator:
                     return entity_name
 
             for name, port in self._entity._info.ports.items():
+
+                if self._port_bv is not None:
+                    port_type = type(Port.decay(port))
+
+                    if issubclass(port_type, BitVector) and not (
+                        issubclass(port_type, (Signed, Unsigned))
+                    ):
+                        if self._port_bv is Unsigned:
+                            port = port.unsigned
+                        elif self._port_bv is Signed:
+                            port = port.signed
+                        else:
+                            raise AssertionError(
+                                f"invalid default vector port type {self._port_bv}"
+                            )
+
                 setattr(EntityProxy, name, ProxyPort(port, getattr(dut, name)))
 
             # first delta step to load default values

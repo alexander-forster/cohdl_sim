@@ -1,10 +1,18 @@
 [project]
 name="cohdl_sim"
+version="0.2.0"
+
 authors = [
     { name = "Alexander Forster", email = "alexander.forster123@gmail.com" }
 ]
+
 description="Simulation support library for CoHDL, based on cocotb"
-version="0.1"
+
+dependencies = [
+    "cohdl",
+    "cocotb",
+    "cocotb_test",
+]
 
 [build-system]
 requires = ["setuptools", "wheel", "pybind11"]

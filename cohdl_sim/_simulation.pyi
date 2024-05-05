@@ -14,6 +14,7 @@ class Simulator:
         sim_dir: str = "sim",
         vhdl_dir: str = "vhdl",
         mkdir: bool = True,
+        cast_vectors=None,
         extra_env: dict[str, str] | None = None,
         **kwargs,
     ):

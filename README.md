@@ -10,15 +10,7 @@ In addition cohdl_sim defines an abstraction layer so test code looks like CoHDL
 cohdl_sim requires Python3.10 or higher. You can install it by running
 
 ```shell
-python3.10 -m pip install git+https://github.com/alexander-forster/cohdl_sim.git#egg=cohdl_sim
+python3 -m pip install cohdl_sim
 ```
 
-in a terminal window.
-
-Since cohdl_sim is just a wrapper around [cocotb](https://www.cocotb.org/) and [cocotb-test](https://github.com/themperek/cocotb-test) you will also need them and a [supported VHDL simulator](https://docs.cocotb.org/en/stable/simulator_support.html). So far I have only used [GHDL](https://github.com/ghdl/ghdl).
-
-```shell
-python3.10 -m pip install cocotb
-python3.10 -m pip install cocotb_test
-```
-
+Since cohdl_sim is just a wrapper around [cocotb](https://www.cocotb.org/) you will also need one of the [supported VHDL simulators](https://docs.cocotb.org/en/stable/simulator_support.html). So far I have only used [GHDL](https://github.com/ghdl/ghdl).

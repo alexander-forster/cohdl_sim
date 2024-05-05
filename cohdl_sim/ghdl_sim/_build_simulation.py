@@ -35,7 +35,7 @@ def prepare_ghdl_simulation(
         else:
             assert Path(source_path).parent == build_dir
 
-    curdir = os.curdir
+    curdir = Path(os.curdir).absolute()
 
     try:
         os.chdir(build_dir)

@@ -275,9 +275,8 @@ namespace ghdl_cohdl_interface
             }
             catch(const std::exception& e)
             {
-                std::cerr << "CAUGHT EXCEPTION\n";
                 std::cerr << e.what() << '\n';
-                std::cerr << "----" << std::endl;
+                GhdlInterface::singleton().finish_simulation();
             }
             catch(...)
             {

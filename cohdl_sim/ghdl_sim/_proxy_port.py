@@ -1,20 +1,11 @@
-from cohdl_sim_ghdl_interface import GhdlInterface, ObjHandle
+from cohdl_sim_ghdl_interface import ObjHandle
 
-from cohdl import Signal, Port, Bit, BitVector, Unsigned, Signed
+from cohdl import Signal, Bit, BitVector, Unsigned, Signed
 from cohdl_sim._generic_proxy_port import _GenericProxyPort
-from cohdl.std import instance_check
 
 
 class ProxyPort(_GenericProxyPort):
     def __init__(self, entity_port: Signal, ghdl_handle: ObjHandle, sim):
-        assert not (
-            instance_check(entity_port, Unsigned) and len(entity_port) >= 31
-        ), "the ghdl simulator interface does not support unsigned ports with a width greater than 31"
-
-        assert not (
-            instance_check(entity_port, Signed) and len(entity_port) >= 32
-        ), "the ghdl simulator interface does not support signed ports with a width greater than 32"
-
         super().__init__(entity_port)
         self._handle = ghdl_handle
         self._sim = sim
@@ -29,6 +20,6 @@ class ProxyPort(_GenericProxyPort):
 
     def _store(self):
         if isinstance(self._val, (Unsigned, Signed)):
-            self._handle.put_integer(self._val.to_int())
+            self._handle.put_binstr(str(self._val.bitvector))
         else:
             self._handle.put_binstr(str(self._val))

@@ -1,4 +1,4 @@
-from cohdl import Entity
+from cohdl import Entity, Port, BitVector, Unsigned, Signed
 from cohdl import std
 
 from pathlib import Path
@@ -21,19 +21,10 @@ _suspend = _Suspend()
 global_alive_list = []
 
 
-def n(i):
-    return i
-
-
-def x(i):
+# ugly workaround to keep python objects referenced in the simulator alive
+def _keep_alive(i):
     global_alive_list.append(i)
     return i
-
-
-def l(x):
-    x.__del__ = lambda: print("DEL")
-
-    return x
 
 
 class Simulator:
@@ -44,6 +35,7 @@ class Simulator:
         build_dir: str = "build",
         mkdir=True,
         sim_args=None,
+        cast_vectors=None,
     ):
         build_dir = Path(build_dir)
 
@@ -73,6 +65,7 @@ class Simulator:
 
         self._tb = None
         self._current_coro = None
+        self._port_bv = cast_vectors
 
     def port_names(self) -> list[str]:
         return [name for name in self._entity._info.ports]
@@ -94,6 +87,21 @@ class Simulator:
                 return entity_name
 
         for name, port in self._entity._info.ports.items():
+            if self._port_bv is not None:
+                port_type = type(Port.decay(port))
+
+                if issubclass(port_type, BitVector) and not (
+                    issubclass(port_type, (Signed, Unsigned))
+                ):
+                    if self._port_bv is Unsigned:
+                        port = port.unsigned
+                    elif self._port_bv is Signed:
+                        port = port.signed
+                    else:
+                        raise AssertionError(
+                            f"invalid default vector port type {self._port_bv}"
+                        )
+
             setattr(
                 EntityProxy,
                 name,
@@ -135,7 +143,7 @@ class Simulator:
         self._sim.stop()
 
     async def _wait_picoseconds(self, picos: int):
-        with x(
+        with _keep_alive(
             self._sim.cb_delay(
                 partial(self._continue, self._current_coro, name="picos"), picos
             )
@@ -146,15 +154,15 @@ class Simulator:
         await self._wait_picoseconds(int(duration.picoseconds()))
 
     async def delta_step(self):
-        with x(self._sim.cb_delay(partial(self._continue, self._current_coro), 1)):
+        with _keep_alive(
+            self._sim.cb_delay(partial(self._continue, self._current_coro), 1)
+        ):
             await _suspend
 
     async def rising_edge(self, signal: ProxyPort):
-        with n(
-            self._sim.cb_value_change(
-                signal._root._handle,
-                partial(self._continue, self._current_coro, name="rising_edge"),
-            )
+        with self._sim.cb_value_change(
+            signal._root._handle,
+            partial(self._continue, self._current_coro, name="rising_edge"),
         ):
             prev_state = signal.copy()
 
