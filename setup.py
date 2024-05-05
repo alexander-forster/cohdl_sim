@@ -29,7 +29,7 @@ if os.name == "posix":
 
 setup(
     name="cohdl_sim",
-    version="0.1",
+    version="0.2.0",
     author="Alexander Forster",
     author_email="alexander.forster123@gmail.com",
     description="Simulation support library for CoHDL, based on cocotb",

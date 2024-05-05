@@ -252,7 +252,7 @@ namespace ghdl_cohdl_interface
 
                 if (result == 0)
                 {
-                    "REMOVE_CB failed in handler\n";
+                    std::cerr << "REMOVE_CB failed in handler\n";
                 }
             }
 
@@ -263,7 +263,7 @@ namespace ghdl_cohdl_interface
 
                 if (fn == nullptr)
                 {
-                    std::cout << "VALUE IS NULLPTR\n";
+                    std::cerr << "VALUE IS NULLPTR\n";
                 }
                 else
                 {
