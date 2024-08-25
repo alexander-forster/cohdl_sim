@@ -1,6 +1,6 @@
 [project]
 name="cohdl_sim"
-version="0.2.0"
+version="0.2.3"
 
 authors = [
     { name = "Alexander Forster", email = "alexander.forster123@gmail.com" }
@@ -15,14 +15,15 @@ classifiers = [
     "License :: OSI Approved :: MIT License"
 ]
 
-[project.urls]
-Homepage = "https://github.com/alexander-forster/cohdl_sim"
-
 dependencies = [
-    "cohdl",
+    "cohdl>=0.2.3",
     "cocotb",
     "cocotb_test",
 ]
+
+[project.urls]
+Homepage = "https://github.com/alexander-forster/cohdl_sim"
+
 
 [build-system]
 requires = ["setuptools", "wheel", "pybind11"]

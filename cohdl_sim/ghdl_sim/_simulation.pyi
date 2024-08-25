@@ -10,7 +10,7 @@ class Simulator:
         simulator: str = "ghdl",
         sim_args: list[str] | None = None,
         sim_dir: str = "sim",
-        vhdl_dir: str = "vhdl",
+        vhdl_dir: str = "sim",
         mkdir: bool = True,
         cast_vectors=None,
         extra_env: dict[str, str] | None = None,
@@ -18,12 +18,15 @@ class Simulator:
     ):
         """
         Simulator takes a CoHDL entity, generates VHDL code from it
-        and starts a cocotb test session.
+        and starts a GHDL test session.
 
-        build_dir, sim_dir, vhdl_dir and mkdir are used to customize the
-        location of build and simulation output.
+        Differences to the default simulator:
 
-        The other arguments are forwarded to cocotb_test.simulator.run().
+        - `sim_dir` and `vhdl_dir` must be the same
+        - `extra_env` is set in the local process because unlike
+            the default, cocotb-based simulator, tests are executed
+            locally
+        - `kwargs` are ignored
         """
 
     async def wait(self, duration: std.Duration):
@@ -114,23 +117,8 @@ class Simulator:
         with the specified period or frequency on `clk`.
         """
 
-    def get_dut(self):
-        """
-        return the cocotb design under test object
-        """
-
     def test(self, testbench):
         """
         decorator turns coroutines into test benches
         """
         return testbench
-
-    def freeze(self, port: Signal):
-        """
-        freeze the signal in its current state
-        """
-
-    def release(self, port: Signal):
-        """
-        release a frozen signal
-        """

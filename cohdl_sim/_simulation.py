@@ -81,6 +81,9 @@ class Simulator:
                 **kwargs,
             )
         else:
+            # instantiate entity to generate dynamic ports
+            entity(_cohdl_instantiate_only=True)
+
             # running in simulator process
             # initialize members used by Simulator.test
 
@@ -192,7 +195,7 @@ class Simulator:
                 def __repr__(self):
                     return entity_name
 
-            for name, port in self._entity._info.ports.items():
+            for name, port in self._entity._cohdl_info.ports.items():
 
                 if self._port_bv is not None:
                     port_type = type(Port.decay(port))

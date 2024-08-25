@@ -33,30 +33,53 @@ class Simulator:
         entity: type[Entity],
         *,
         build_dir: str = "build",
+        simulator: str = "ghdl",
+        sim_args: list[str] = None,
+        sim_dir: str = "sim",
+        vhdl_dir: str = "sim",
         mkdir=True,
-        sim_args=None,
         cast_vectors=None,
+        extra_env: dict[str, str] | None = None,
+        **kwargs,
     ):
-        build_dir = Path(build_dir)
+        assert (
+            simulator == "ghdl"
+        ), "cohdl_sim.ghdl_sim only supports the ghdl simulator"
 
-        if not os.path.exists(build_dir):
-            if mkdir:
-                os.makedirs(build_dir, exist_ok=True)
-            else:
-                raise AssertionError(f"target directory '{build_dir}' does not exist")
+        assert (
+            sim_dir == vhdl_dir,
+            "cohdl_sim.ghdl_sim requires `sim_dir` and `vhdl_dir` to be the same",
+        )
+
+        # ghdl_sim executes in the current context
+        # set extra-env locally
+        if extra_env is not None:
+            for name, val in extra_env.items():
+                os.environ[name] = val
+
+        if len(kwargs) != 0:
+            print(f"ignoring additional arguments: {[*kwargs.keys()]}")
+
+        build_dir = Path(build_dir)
+        sim_dir = build_dir / sim_dir
+        vhdl_dir = build_dir / vhdl_dir
+
+        for dir in (build_dir, sim_dir, vhdl_dir):
+            if not os.path.exists(dir):
+                if mkdir:
+                    os.makedirs(dir, exist_ok=True)
+                else:
+                    raise AssertionError(f"target directory '{dir}' does not exist")
 
         lib = std.VhdlCompiler.to_vhdl_library(entity)
 
         top_name = lib.top_entity().name()
-        entity_names = [sub.name() for sub in lib._entities]
 
-        lib.write_dir(build_dir)
-
-        vhdl_sources = [f"{build_dir}/{name}.vhd" for name in entity_names]
+        vhdl_sources = lib.write_dir(vhdl_dir)
 
         self._entity = entity
         self._simlib = prepare_ghdl_simulation(
-            vhdl_sources, top_name, build_dir, copy_files=False
+            vhdl_sources, top_name, sim_dir, copy_files=False
         )
 
         self._top_name = top_name
@@ -68,7 +91,7 @@ class Simulator:
         self._port_bv = cast_vectors
 
     def port_names(self) -> list[str]:
-        return [name for name in self._entity._info.ports]
+        return [name for name in self._entity._cohdl_info.ports]
 
     def _initial_fn(self):
         entity_name = self._entity.__name__
@@ -86,7 +109,7 @@ class Simulator:
             def __repr__(self):
                 return entity_name
 
-        for name, port in self._entity._info.ports.items():
+        for name, port in self._entity._cohdl_info.ports.items():
             if self._port_bv is not None:
                 port_type = type(Port.decay(port))
 
