@@ -32,7 +32,7 @@ class Simulator:
         self,
         entity: type[Entity],
         *,
-        build_dir: str = "build",
+        build_dir: Path = "build",
         simulator: str = "ghdl",
         sim_args: list[str] = None,
         sim_dir: str = "sim",
@@ -40,16 +40,19 @@ class Simulator:
         mkdir=True,
         cast_vectors=None,
         extra_env: dict[str, str] | None = None,
+        extra_vhdl_files: list[str] = None,
+        use_build_cache: bool = False,
         **kwargs,
     ):
+        from cohdl_sim._build_cache import write_cache_file, load_cache_file
+
         assert (
             simulator == "ghdl"
         ), "cohdl_sim.ghdl_sim only supports the ghdl simulator"
 
         assert (
-            sim_dir == vhdl_dir,
-            "cohdl_sim.ghdl_sim requires `sim_dir` and `vhdl_dir` to be the same",
-        )
+            sim_dir == vhdl_dir
+        ), "cohdl_sim.ghdl_sim requires `sim_dir` and `vhdl_dir` to be the same"
 
         # ghdl_sim executes in the current context
         # set extra-env locally
@@ -60,9 +63,16 @@ class Simulator:
         if len(kwargs) != 0:
             print(f"ignoring additional arguments: {[*kwargs.keys()]}")
 
+        vhdl_sources = list(extra_vhdl_files) if extra_vhdl_files is not None else []
+
         build_dir = Path(build_dir)
         sim_dir = build_dir / sim_dir
         vhdl_dir = build_dir / vhdl_dir
+
+        cache_file = build_dir / ".build-cache.ghdl.json"
+
+        # use cache file if it exists, rebuild it otherwise
+        use_build_cache = use_build_cache and cache_file.exists()
 
         for dir in (build_dir, sim_dir, vhdl_dir):
             if not os.path.exists(dir):
@@ -71,11 +81,16 @@ class Simulator:
                 else:
                     raise AssertionError(f"target directory '{dir}' does not exist")
 
-        lib = std.VhdlCompiler.to_vhdl_library(entity)
+        top_name = entity._cohdl_info.name
 
-        top_name = lib.top_entity().name()
+        if not use_build_cache:
+            lib = std.VhdlCompiler.to_vhdl_library(entity)
+            vhdl_sources += lib.write_dir(vhdl_dir)
 
-        vhdl_sources = lib.write_dir(vhdl_dir)
+            write_cache_file(cache_file, entity, vhdl_sources=vhdl_sources)
+        else:
+            cache_content = load_cache_file(cache_file, entity)
+            vhdl_sources = cache_content.vhdl_sources
 
         self._entity = entity
         self._simlib = prepare_ghdl_simulation(

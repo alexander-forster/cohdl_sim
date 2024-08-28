@@ -14,6 +14,8 @@ class Simulator:
         mkdir: bool = True,
         cast_vectors=None,
         extra_env: dict[str, str] | None = None,
+        extra_vhdl_files: list[str] = None,
+        use_build_cache: bool = False,
         **kwargs,
     ):
         """
@@ -21,7 +23,13 @@ class Simulator:
         and starts a cocotb test session.
 
         build_dir, sim_dir, vhdl_dir and mkdir are used to customize the
-        location of build and simulation output.
+        location of build and simulation output. `extra_vhdl_files`
+        is a list of additional vhdl sources to include in the build.
+
+        When `use_build_cache` is set to True, the design is only build
+        once. Subsequent tests will use the vhdl-sources of that build.
+        This can be useful to speedup test runs, the user must take care
+        to set this value to False whenever a new build is needed.
 
         The other arguments are forwarded to cocotb_test.simulator.run().
         """

@@ -14,6 +14,8 @@ class Simulator:
         mkdir: bool = True,
         cast_vectors=None,
         extra_env: dict[str, str] | None = None,
+        extra_vhdl_files: list[str] = None,
+        use_build_cache: bool = False,
         **kwargs,
     ):
         """

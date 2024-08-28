@@ -1,4 +1,4 @@
-from cohdl import Entity, BitVector, Unsigned, Port, Null, Full
+from cohdl import Entity, BitVector, Unsigned, Port, Null
 from cohdl import std
 
 from cohdl_sim import Simulator

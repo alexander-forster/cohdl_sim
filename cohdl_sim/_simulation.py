@@ -12,6 +12,7 @@ from cohdl import Entity, Port, BitVector, Signed, Unsigned
 from cohdl import std
 
 from ._proxy_port import ProxyPort
+from pathlib import Path
 
 
 class Simulator:
@@ -19,7 +20,7 @@ class Simulator:
         self,
         entity: type[Entity],
         *,
-        build_dir: str = "build",
+        build_dir: Path = "build",
         simulator: str = "ghdl",
         sim_args: list[str] | None = None,
         sim_dir: str = "sim",
@@ -27,10 +28,18 @@ class Simulator:
         mkdir: bool = True,
         cast_vectors=None,
         extra_env: dict[str, str] | None = None,
+        extra_vhdl_files: list[str] = None,
+        use_build_cache: bool = False,
         **kwargs,
     ):
+        from cohdl_sim._build_cache import write_cache_file, load_cache_file
+
+        build_dir = Path(build_dir)
+
         sim_args = [] if sim_args is None else sim_args
         extra_env = {} if extra_env is None else extra_env
+
+        vhdl_sources = list(extra_vhdl_files) if extra_vhdl_files is not None else []
 
         # This code is evaluated twice. Once in normal user code
         # to setup the test environment and again from another process
@@ -41,8 +50,12 @@ class Simulator:
             # run CoHDL design into VHDL code and
             # start cocotb simulator
 
-            sim_dir = f"{build_dir}/{sim_dir}"
-            vhdl_dir = f"{build_dir}/{vhdl_dir}"
+            sim_dir = build_dir / sim_dir
+            vhdl_dir = build_dir / vhdl_dir
+            cache_file = build_dir / ".build-cache.json"
+
+            # use cache file if it exists, rebuild it otherwise
+            use_build_cache = use_build_cache and cache_file.exists()
 
             if not os.path.exists(vhdl_dir):
                 if mkdir:
@@ -52,14 +65,16 @@ class Simulator:
                         f"target directory '{vhdl_dir}' does not exist"
                     )
 
-            lib = std.VhdlCompiler.to_vhdl_library(entity)
+            top_name = entity._cohdl_info.name
 
-            top_name = lib.top_entity().name()
-            entity_names = [sub.name() for sub in lib._entities]
+            if not use_build_cache:
+                lib = std.VhdlCompiler.to_vhdl_library(entity)
+                vhdl_sources += lib.write_dir(vhdl_dir)
 
-            lib.write_dir(vhdl_dir)
-
-            vhdl_sources = [f"{vhdl_dir}/{name}.vhd" for name in entity_names]
+                write_cache_file(cache_file, entity, vhdl_sources=vhdl_sources)
+            else:
+                cache_content = load_cache_file(cache_file, entity)
+                vhdl_sources = cache_content.vhdl_sources
 
             # cocotb_simulator.run() requires the module name
             # of the Python file containing the test benches
