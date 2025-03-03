@@ -1,7 +1,10 @@
 from cohdl import Entity, BitVector, Unsigned, Port, Null
 from cohdl import std
 
-from cohdl_sim.ghdl_sim import Simulator
+from cohdl_sim import Simulator
+
+# alternative simulator, direct ghdl access without cocotb
+# from cohdl_sim.ghdl_sim import Simulator
 
 
 # same as example 05_casts but the output ports are defined

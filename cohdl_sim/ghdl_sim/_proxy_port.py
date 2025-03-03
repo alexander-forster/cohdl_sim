@@ -14,12 +14,12 @@ class ProxyPort(_GenericProxyPort):
         val = self._handle.get_binstr()
 
         if issubclass(self._type, (Bit, BitVector)):
-            self._val._assign(val.upper())
+            self._Wrapped._assign(val.upper())
         else:
             raise AssertionError(f"type {type(self._type)} not supported")
 
     def _store(self):
-        if isinstance(self._val, (Unsigned, Signed)):
-            self._handle.put_binstr(str(self._val.bitvector))
+        if isinstance(self._Wrapped, (Unsigned, Signed)):
+            self._handle.put_binstr(str(self._Wrapped.bitvector))
         else:
-            self._handle.put_binstr(str(self._val))
+            self._handle.put_binstr(str(self._Wrapped))

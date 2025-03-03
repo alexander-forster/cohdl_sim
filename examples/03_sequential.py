@@ -3,6 +3,9 @@ from cohdl import std
 
 from cohdl_sim import Simulator
 
+# alternative simulator, direct ghdl access without cocotb
+# from cohdl_sim.ghdl_sim import Simulator
+
 
 class MyEntity(Entity):
     clk = Port.input(Bit)
@@ -60,6 +63,7 @@ async def testbench_gen_clk(entity: MyEntity):
     # and waiting for a rising edge on entity.clk
     entity.reset <<= True
     await sim.rising_edge(entity.clk)
+    await sim.delta_step()
     entity.reset <<= False
 
     # check entity.cnt for 10 clock cycles
@@ -67,3 +71,4 @@ async def testbench_gen_clk(entity: MyEntity):
         assert entity.cnt == cnt
 
         await sim.rising_edge(entity.clk)
+        await sim.delta_step()

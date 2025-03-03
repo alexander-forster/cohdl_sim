@@ -3,13 +3,16 @@ from cohdl import std
 
 from cohdl_sim import Simulator
 
+# alternative simulator, direct ghdl access without cocotb
+# from cohdl_sim.ghdl_sim import Simulator
+
 
 class MyEntity(Entity):
     inp_a = Port.input(BitVector[4])
     inp_b = Port.input(BitVector[4])
 
-    result_and = Port.output(BitVector[4])
     result_or = Port.output(BitVector[4])
+    result_and = Port.output(BitVector[4])
     result_concat = Port.output(BitVector[8])
 
     def architecture(self):

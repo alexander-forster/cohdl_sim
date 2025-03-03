@@ -20,13 +20,13 @@ class _GenericProxyPort(TypeQualifierBase):
         root=None,
         uid: int | None = None,
     ):
-        self._val = Port.decay(entity_port)
-        self._type = type(self._val)
+        self._Wrapped = Port.decay(entity_port)
+        self._type = type(self._Wrapped)
         self._root = self if root is None else root
         self._uid = id(self) if uid is None else uid
 
     def decay(self):
-        return Port.decay(self._val)
+        return Port.decay(self._Wrapped)
 
     def __call__(self):
         return self
@@ -39,7 +39,7 @@ class _GenericProxyPort(TypeQualifierBase):
 
     def copy(self):
         self._load()
-        return self._val.copy()
+        return self._Wrapped.copy()
 
     @property
     def signed(self):
@@ -50,7 +50,7 @@ class _GenericProxyPort(TypeQualifierBase):
             _prev_property = self
             return self
 
-        result = _GenericProxyPort(self._val.signed, self._root, self._uid)
+        result = _GenericProxyPort(self._Wrapped.signed, self._root, self._uid)
         result._load = self._load
         result._store = self._store
         _prev_property = result
@@ -71,7 +71,7 @@ class _GenericProxyPort(TypeQualifierBase):
             _prev_property = self
             return self
 
-        result = _GenericProxyPort(self._val.unsigned, self._root, self._uid)
+        result = _GenericProxyPort(self._Wrapped.unsigned, self._root, self._uid)
         result._load = self._load
         result._store = self._store
         _prev_property = result
@@ -92,7 +92,7 @@ class _GenericProxyPort(TypeQualifierBase):
             _prev_property = self
             return self
 
-        result = _GenericProxyPort(self._val.bitvector, self._root, self._uid)
+        result = _GenericProxyPort(self._Wrapped.bitvector, self._root, self._uid)
         result._load = self._load
         result._store = self._store
         _prev_property = result
@@ -111,10 +111,10 @@ class _GenericProxyPort(TypeQualifierBase):
             assert isinstance(arg.start, int)
             assert isinstance(arg.stop, int)
             assert arg.step is None
-            result = _GenericProxyPort(self._val[arg], self._root)
+            result = _GenericProxyPort(self._Wrapped[arg], self._root)
         else:
             assert isinstance(arg, int)
-            result = _GenericProxyPort(self._val[arg], self._root)
+            result = _GenericProxyPort(self._Wrapped[arg], self._root)
 
         # Replace load and store methods with version
         # of root object. They always update all bits of
@@ -129,9 +129,9 @@ class _GenericProxyPort(TypeQualifierBase):
 
     def __ilshift__(self, src):
         if isinstance(src, _GenericProxyPort):
-            src = src._val
+            src = src._Wrapped
 
-        self._val._assign(src)
+        self._Wrapped._assign(src)
         self._store()
         return self
 
@@ -149,111 +149,111 @@ class _GenericProxyPort(TypeQualifierBase):
 
     def __bool__(self):
         self._load()
-        return self._val.__bool__()
+        return self._Wrapped.__bool__()
 
     def __index__(self):
         self._load()
-        return self._val.__index__()
+        return self._Wrapped.__index__()
 
     def __eq__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__eq__(other)
+        return self._Wrapped.__eq__(other)
 
     def __gt__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__gt__(other)
+        return self._Wrapped.__gt__(other)
 
     def __lt__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__lt__(other)
+        return self._Wrapped.__lt__(other)
 
     def __ge__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__ge__(other)
+        return self._Wrapped.__ge__(other)
 
     def __invert__(self):
         self._load()
-        return self._val.__invert__()
+        return self._Wrapped.__invert__()
 
     def __le__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__le__(other)
+        return self._Wrapped.__le__(other)
 
     def __add__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__add__(other)
+        return self._Wrapped.__add__(other)
 
     def __sub__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__sub__(other)
+        return self._Wrapped.__sub__(other)
 
     def __and__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__and__(other)
+        return self._Wrapped.__and__(other)
 
     def __or__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__or__(other)
+        return self._Wrapped.__or__(other)
 
     def __xor__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__xor__(other)
+        return self._Wrapped.__xor__(other)
 
     def __matmul__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__matmul__(other)
+        return self._Wrapped.__matmul__(other)
 
     def __radd__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__radd__(other)
+        return self._Wrapped.__radd__(other)
 
     def __rsub__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__rsub__(other)
+        return self._Wrapped.__rsub__(other)
 
     def __rand__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__rand__(other)
+        return self._Wrapped.__rand__(other)
 
     def __ror__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__ror__(other)
+        return self._Wrapped.__ror__(other)
 
     def __rxor__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__rxor__(other)
+        return self._Wrapped.__rxor__(other)
 
     def __rmatmul__(self, other):
         load_all(self, other)
         other = decay(other)
-        return self._val.__rmatmul__(other)
+        return self._Wrapped.__rmatmul__(other)
 
     def resize(self, *args, **kwargs):
         return decay(self).resize(*args, **kwargs)
 
     def __str__(self):
         self._load()
-        return str(self._val)
+        return str(self._Wrapped)
 
     def __repr__(self):
         self._load()
-        return repr(self._val)
+        return repr(self._Wrapped)
 
     def __await__(self):
         async def gen():

@@ -3,6 +3,9 @@ from cohdl import std
 
 from cohdl_sim import Simulator
 
+# alternative simulator, direct ghdl access without cocotb
+# from cohdl_sim.ghdl_sim import Simulator
+
 
 class MyEntity(Entity):
     inp_a = Port.input(Bit)
@@ -35,7 +38,7 @@ sim = Simulator(MyEntity)
 @sim.test
 async def testbench_1(entity: MyEntity):
     # cohdl_sim is a wrapper around cocotb
-    # so test code looks like cohdl
+    # test code looks like cohdl
     entity.inp_a <<= True
     entity.inp_b <<= False
 

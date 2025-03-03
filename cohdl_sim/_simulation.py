@@ -1,5 +1,8 @@
 import os
 import cocotb
+import functools
+
+from pathlib import Path
 
 from cocotb.triggers import (
     Timer,
@@ -10,9 +13,17 @@ from cocotb_test import simulator as cocotb_simulator
 
 from cohdl import Entity, Port, BitVector, Signed, Unsigned
 from cohdl import std
+from cohdl import Null
 
 from ._proxy_port import ProxyPort
-from pathlib import Path
+
+
+class Task:
+    def __init__(self, handle):
+        self._handle = handle
+
+    async def join(self):
+        await self._handle.join()
 
 
 class Simulator:
@@ -20,7 +31,7 @@ class Simulator:
         self,
         entity: type[Entity],
         *,
-        build_dir: Path = "build",
+        build_dir: str = "build",
         simulator: str = "ghdl",
         sim_args: list[str] | None = None,
         sim_dir: str = "sim",
@@ -106,42 +117,67 @@ class Simulator:
             self._dut = None
             self._port_bv = cast_vectors
 
-    async def wait(self, duration: std.Duration):
+    async def wait(self, duration: std.Duration, /):
         await Timer(int(duration.picoseconds()), units="ps")
 
     async def delta_step(self):
         await Timer(1, units="step")
 
-    async def rising_edge(self, signal: ProxyPort):
+    async def rising_edge(self, signal: ProxyPort, /):
         await signal._rising_edge()
-        await self.delta_step()
 
-    async def falling_edge(self, signal: ProxyPort):
+    async def falling_edge(self, signal: ProxyPort, /):
         await signal._falling_edge()
-        await self.delta_step()
 
-    async def any_edge(self, signal: ProxyPort):
+    async def any_edge(self, signal: ProxyPort, /):
         await signal._edge()
-        await self.delta_step()
+
+    async def clock_edge(self, clk: std.Clock, /):
+        Edge = std.Clock.Edge
+
+        match clk.edge():
+            case Edge.RISING:
+                await self.rising_edge(clk.signal())
+            case Edge.FALLING:
+                await self.falling_edge(clk.signal())
+            case Edge.BOTH:
+                await self.any_edge(clk.signal())
+            case _:
+                raise AssertionError(f"invalid clock edge {clk.edge()}")
+
+    async def reset_cond(self, reset: std.Reset, /):
+        if reset.is_active_high():
+            if reset.is_async():
+                await self.value_true(reset.signal())
+            else:
+                await self.rising_edge(reset.signal())
+        else:
+            if reset.is_async():
+                await self.value_false(reset.signal())
+            else:
+                await self.falling_edge(reset.signal())
 
     async def clock_cycles(self, signal: ProxyPort, num_cycles: int, rising=True):
-        await signal._clock_cycles(num_cycles, rising)
-        await self.delta_step()
+        if isinstance(signal, std.Clock):
+            signal = signal.signal()
 
-    async def value_change(self, signal: ProxyPort):
+        await signal._clock_cycles(num_cycles, rising)
+
+    async def value_change(self, signal: ProxyPort, /):
         await Edge(signal._cocotb_port)
 
-    async def value_true(self, signal: ProxyPort):
+    async def value_true(self, signal: ProxyPort, /):
         while not signal:
             await signal._edge()
 
-    async def value_false(self, signal: ProxyPort):
+    async def value_false(self, signal: ProxyPort, /):
         while signal:
             await signal._edge()
 
     async def true_on_rising(self, clk: ProxyPort, cond, *, timeout: int | None = None):
         while True:
             await self.rising_edge(clk)
+
             if cond():
                 return
 
@@ -154,6 +190,7 @@ class Simulator:
     ):
         while True:
             await self.falling_edge(clk)
+
             if cond():
                 return
 
@@ -161,17 +198,67 @@ class Simulator:
                 assert timeout != 0, "timeout while waiting for condition"
                 timeout -= 1
 
-    async def start(self, coro):
-        await cocotb.start(coro)
+    async def true_on_clk(self, clk: std.Clock, cond, *, timeout: int | None = None):
+        if clk.is_rising_edge():
+            await self.true_on_rising(clk.signal(), cond, timeout=timeout)
+        else:
+            await self.true_on_falling(clk.signal(), cond, timeout=timeout)
 
-    def start_soon(self, coro):
-        cocotb.start_soon(coro)
+    #
+    #
+
+    async def true_after_rising(
+        self, clk: ProxyPort, cond, *, timeout: int | None = None
+    ):
+        while True:
+            await self.rising_edge(clk)
+            await self.delta_step()
+
+            if cond():
+                return
+
+            if timeout is not None:
+                assert timeout != 0, "timeout while waiting for condition"
+                timeout -= 1
+
+    async def true_after_falling(
+        self, clk: ProxyPort, cond, *, timeout: int | None = None
+    ):
+        while True:
+            await self.falling_edge(clk)
+            await self.delta_step()
+
+            if cond():
+                return
+
+            if timeout is not None:
+                assert timeout != 0, "timeout while waiting for condition"
+                timeout -= 1
+
+    async def true_after_clk(self, clk: std.Clock, cond, *, timeout: int | None = None):
+        if clk.is_rising_edge():
+            await self.true_after_rising(clk.signal(), cond, timeout=timeout)
+        else:
+            await self.true_after_falling(clk.signal(), cond, timeout=timeout)
+
+    async def start(self, coro, /):
+        return Task(await cocotb.start(coro))
+
+    def start_soon(self, coro, /):
+        return Task(cocotb.start_soon(coro))
 
     def gen_clock(
         self, clk, period_or_frequency: std.Duration = None, /, start_state=False
     ):
-        if isinstance(period_or_frequency, (std.Frequency, std.Duration)):
-            period = period_or_frequency.period()
+        if isinstance(clk, std.Clock):
+            if period_or_frequency is None:
+                period_or_frequency = clk.frequency()
+
+            clk = clk.signal()
+
+        assert isinstance(period_or_frequency, (std.Frequency, std.Duration))
+
+        period = period_or_frequency.period()
 
         half = int(period.picoseconds()) // 2
 
@@ -191,9 +278,15 @@ class Simulator:
         ), "get_dut may only be called from a testbench function running in cocotb"
         return self._dut
 
-    def test(self, testbench):
+    def test(self, testbench, /):
         @cocotb.test()
+        @functools.wraps(testbench)
         async def helper(dut):
+            self._ports = {}
+            self._input_ports = {}
+            self._output_ports = {}
+            self._inout_ports = {}
+
             self._dut = dut
             entity_name = self._entity.__name__
 
@@ -227,7 +320,18 @@ class Simulator:
                                 f"invalid default vector port type {self._port_bv}"
                             )
 
-                setattr(EntityProxy, name, ProxyPort(port, getattr(dut, name)))
+                proxy = ProxyPort(port, getattr(dut, name))
+                setattr(EntityProxy, name, proxy)
+
+                self._ports[name] = proxy
+
+                match port.direction():
+                    case Port.Direction.INPUT:
+                        self._input_ports[name] = proxy
+                    case Port.Direction.OUTPUT:
+                        self._output_ports[name] = proxy
+                    case Port.Direction.INOUT:
+                        self._inout_ports[name] = proxy
 
             # first delta step to load default values
             await Timer(1, units="step")
@@ -239,8 +343,20 @@ class Simulator:
 
         return helper
 
-    def freeze(self, port: ProxyPort):
+    def freeze(self, port: ProxyPort, /):
         port.freeze()
 
-    def release(self, port: ProxyPort):
+    def release(self, port: ProxyPort, /):
         port.release()
+
+    def init_inputs(self, init_val=Null, /):
+        for port in self._input_ports.values():
+            port <<= init_val
+
+    def init_outputs(self, init_val=Null, /):
+        for port in self._output_ports.values():
+            port <<= init_val
+
+    def init_inouts(self, init_val=Null, /):
+        for port in self._inout_ports.values():
+            port <<= init_val

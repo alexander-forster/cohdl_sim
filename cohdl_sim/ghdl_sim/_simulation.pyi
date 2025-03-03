@@ -1,4 +1,4 @@
-from cohdl import Entity, Signal, Bit
+from cohdl import Entity, Signal, Bit, Null
 from cohdl import std
 
 class Simulator:
@@ -59,7 +59,7 @@ class Simulator:
     async def clock_cycles(self, signal: Signal[Bit], num_cycles: int, rising=True):
         """
         wait for a number of clock cycles,
-        rising determines whether rising or falling edges are counted
+        `rising` determines whether rising or falling edges are counted
         """
 
     async def value_change(self, signal: Signal):
@@ -109,14 +109,17 @@ class Simulator:
 
     def gen_clock(
         self,
-        clk: Signal[Bit],
-        period_or_frequency: std.Duration | std.Frequency,
+        clk: Signal[Bit] | std.Clock,
+        period_or_frequency: std.Duration | std.Frequency | None = None,
         /,
         start_state=False,
     ) -> None:
         """
         Start a parallel task that produces a clock signal
         with the specified period or frequency on `clk`.
+
+        The `period_of_frequency` parameter is mandatory unless
+        `clk` is a `std.Clock` and defines its own frequency.
         """
 
     def test(self, testbench):
@@ -124,3 +127,18 @@ class Simulator:
         decorator turns coroutines into test benches
         """
         return testbench
+
+    def init_inputs(self, init_val=Null, /):
+        """
+        assign `init_val` to all input ports of the tested entity
+        """
+
+    def init_outputs(self, init_val=Null, /):
+        """
+        assign `init_val` to all output ports of the tested entity
+        """
+
+    def init_inouts(self, init_val=Null, /):
+        """
+        assign `init_val` to all inout ports of the tested entity
+        """
