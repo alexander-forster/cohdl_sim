@@ -1,12 +1,16 @@
 from cohdl_sim_ghdl_interface import ObjHandle
 
 from cohdl import Signal, Bit, BitVector, Unsigned, Signed
-from cohdl_sim._generic_proxy_port import _GenericProxyPort
+from cohdl_sim._base_proxy_port import _BaseProxyPort
 
 
-class ProxyPort(_GenericProxyPort):
-    def __init__(self, entity_port: Signal, ghdl_handle: ObjHandle, sim):
-        super().__init__(entity_port)
+class ProxyPort(_BaseProxyPort):
+    def __init__(
+        self, entity_port: Signal, root=None, ghdl_handle: ObjHandle = None, sim=None
+    ):
+        super().__init__(entity_port, root)
+
+        # the remaining members are None unless this is the root port
         self._handle = ghdl_handle
         self._sim = sim
 
@@ -23,3 +27,9 @@ class ProxyPort(_GenericProxyPort):
             self._handle.put_binstr(str(self._Wrapped.bitvector))
         else:
             self._handle.put_binstr(str(self._Wrapped))
+
+    def __await__(self):
+        async def gen():
+            return await self._root._sim.value_true(self)
+
+        return gen().__await__()

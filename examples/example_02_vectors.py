@@ -1,10 +1,13 @@
 from cohdl import Entity, BitVector, Port, Null, Full
 from cohdl import std
 
-from cohdl_sim import Simulator
+from examples import _config
 
-# alternative simulator, direct ghdl access without cocotb
-# from cohdl_sim.ghdl_sim import Simulator
+if not _config.use_ghdl_direct():
+    from cohdl_sim import Simulator
+else:
+    # alternative simulator, direct ghdl access without cocotb
+    from cohdl_sim.ghdl_sim import Simulator
 
 
 class MyEntity(Entity):
@@ -39,15 +42,15 @@ async def testbench(entity: MyEntity):
 
     for i in range(4):
         # simulation code can read and write slices of ports
-        assert entity.result_or[i] == True
-        assert entity.result_and[i] == False
-        assert entity.result_concat[i] == True
-        assert entity.result_concat[i + 4] == False
+        assert entity.result_or[i]
+        assert not entity.result_and[i]
+        assert entity.result_concat[i]
+        assert not entity.result_concat[i + 4]
 
     entity.inp_a[0] <<= True
 
     await sim.delta_step()
 
-    assert entity.result_or[0] == True
-    assert entity.result_and[0] == True
-    assert entity.result_concat[4] == True
+    assert entity.result_or[0]
+    assert entity.result_and[0]
+    assert entity.result_concat[4]

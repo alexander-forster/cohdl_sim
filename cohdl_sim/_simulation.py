@@ -2,8 +2,6 @@ import os
 import cocotb
 import functools
 
-from pathlib import Path
-
 from cocotb.triggers import (
     Timer,
     Edge,
@@ -13,9 +11,9 @@ from cocotb_test import simulator as cocotb_simulator
 
 from cohdl import Entity, Port, BitVector, Signed, Unsigned
 from cohdl import std
-from cohdl import Null
 
 from ._proxy_port import ProxyPort
+from ._base_simulation import _GenericParams, _BaseSimulator
 
 
 class Task:
@@ -26,31 +24,12 @@ class Task:
         await self._handle.join()
 
 
-class Simulator:
-    def __init__(
-        self,
-        entity: type[Entity],
-        *,
-        build_dir: str = "build",
-        simulator: str = "ghdl",
-        sim_args: list[str] | None = None,
-        sim_dir: str = "sim",
-        vhdl_dir: str = "vhdl",
-        mkdir: bool = True,
-        cast_vectors=None,
-        extra_env: dict[str, str] | None = None,
-        extra_vhdl_files: list[str] = None,
-        use_build_cache: bool = False,
-        **kwargs,
-    ):
+class Simulator(_BaseSimulator):
+
+    def _init_impl(self, p: _GenericParams, cocotb_extra_args=None):
         from cohdl_sim._build_cache import write_cache_file, load_cache_file
 
-        build_dir = Path(build_dir)
-
-        sim_args = [] if sim_args is None else sim_args
-        extra_env = {} if extra_env is None else extra_env
-
-        vhdl_sources = list(extra_vhdl_files) if extra_vhdl_files is not None else []
+        vhdl_sources = p.extra_vhdl_files
 
         # This code is evaluated twice. Once in normal user code
         # to setup the test environment and again from another process
@@ -61,30 +40,15 @@ class Simulator:
             # run CoHDL design into VHDL code and
             # start cocotb simulator
 
-            sim_dir = build_dir / sim_dir
-            vhdl_dir = build_dir / vhdl_dir
-            cache_file = build_dir / ".build-cache.json"
+            top_name = p.entity._cohdl_info.name
 
-            # use cache file if it exists, rebuild it otherwise
-            use_build_cache = use_build_cache and cache_file.exists()
+            if not p.use_build_cache:
+                lib = std.VhdlCompiler.to_vhdl_library(p.entity)
+                vhdl_sources += lib.write_dir(p.vhdl_dir)
 
-            if not os.path.exists(vhdl_dir):
-                if mkdir:
-                    os.makedirs(vhdl_dir, exist_ok=True)
-                else:
-                    raise AssertionError(
-                        f"target directory '{vhdl_dir}' does not exist"
-                    )
-
-            top_name = entity._cohdl_info.name
-
-            if not use_build_cache:
-                lib = std.VhdlCompiler.to_vhdl_library(entity)
-                vhdl_sources += lib.write_dir(vhdl_dir)
-
-                write_cache_file(cache_file, entity, vhdl_sources=vhdl_sources)
+                write_cache_file(p.cache_file, p.entity, vhdl_sources=vhdl_sources)
             else:
-                cache_content = load_cache_file(cache_file, entity)
+                cache_content = load_cache_file(p.cache_file, p.entity)
                 vhdl_sources = cache_content.vhdl_sources
 
             # cocotb_simulator.run() requires the module name
@@ -93,29 +57,59 @@ class Simulator:
             import inspect
             import pathlib
 
-            filename = inspect.stack()[1].filename
+            filename = inspect.stack()[2].filename
             filename = pathlib.Path(filename).stem
 
+            cocotb_extra_args = {} if cocotb_extra_args is None else cocotb_extra_args
+
             cocotb_simulator.run(
-                simulator=simulator,
-                sim_args=sim_args,
-                sim_build=sim_dir,
+                simulator=p.simulator,
+                sim_args=p.sim_args,
+                sim_build=p.sim_dir,
                 vhdl_sources=vhdl_sources,
                 toplevel=top_name.lower(),
                 module=filename,
-                extra_env={"COHDLSIM_TEST_RUNNING": "True", **extra_env},
-                **kwargs,
+                extra_env={"COHDLSIM_TEST_RUNNING": "True", **p.extra_env},
+                **cocotb_extra_args,
             )
         else:
-            # instantiate entity to generate dynamic ports
-            entity(_cohdl_instantiate_only=True)
-
             # running in simulator process
             # initialize members used by Simulator.test
 
-            self._entity = entity
+            # instantiate entity to generate dynamic ports
+            p.entity(_cohdl_instantiate_only=True)
             self._dut = None
-            self._port_bv = cast_vectors
+
+    def __init__(
+        self,
+        entity: type[Entity],
+        *,
+        build_dir: str = "build",
+        simulator: str = "ghdl",
+        sim_args: list[str] | None = None,
+        sim_dir: str = "sim",
+        vhdl_dir: str = "vhdl",
+        cast_vectors=None,
+        extra_env: dict[str, str] | None = None,
+        extra_vhdl_files: list[str] = None,
+        use_build_cache: bool = False,
+        cocotb_extra_args: dict[str, str] | None = None,
+    ):
+        p = _GenericParams(
+            entity=entity,
+            build_dir=build_dir,
+            simulator=simulator,
+            sim_args=sim_args,
+            sim_dir=sim_dir,
+            vhdl_dir=vhdl_dir,
+            cast_vectors=cast_vectors,
+            extra_env=extra_env,
+            extra_vhdl_files=extra_vhdl_files,
+            use_build_cache=use_build_cache,
+        )
+
+        super().__init__(p)
+        self._init_impl(p, cocotb_extra_args=cocotb_extra_args)
 
     async def wait(self, duration: std.Duration, /):
         await Timer(int(duration.picoseconds()), units="ps")
@@ -131,31 +125,6 @@ class Simulator:
 
     async def any_edge(self, signal: ProxyPort, /):
         await signal._edge()
-
-    async def clock_edge(self, clk: std.Clock, /):
-        Edge = std.Clock.Edge
-
-        match clk.edge():
-            case Edge.RISING:
-                await self.rising_edge(clk.signal())
-            case Edge.FALLING:
-                await self.falling_edge(clk.signal())
-            case Edge.BOTH:
-                await self.any_edge(clk.signal())
-            case _:
-                raise AssertionError(f"invalid clock edge {clk.edge()}")
-
-    async def reset_cond(self, reset: std.Reset, /):
-        if reset.is_active_high():
-            if reset.is_async():
-                await self.value_true(reset.signal())
-            else:
-                await self.rising_edge(reset.signal())
-        else:
-            if reset.is_async():
-                await self.value_false(reset.signal())
-            else:
-                await self.falling_edge(reset.signal())
 
     async def clock_cycles(self, signal: ProxyPort, num_cycles: int, rising=True):
         if isinstance(signal, std.Clock):
@@ -174,72 +143,8 @@ class Simulator:
         while signal:
             await signal._edge()
 
-    async def true_on_rising(self, clk: ProxyPort, cond, *, timeout: int | None = None):
-        while True:
-            await self.rising_edge(clk)
-
-            if cond():
-                return
-
-            if timeout is not None:
-                assert timeout != 0, "timeout while waiting for condition"
-                timeout -= 1
-
-    async def true_on_falling(
-        self, clk: ProxyPort, cond, *, timeout: int | None = None
-    ):
-        while True:
-            await self.falling_edge(clk)
-
-            if cond():
-                return
-
-            if timeout is not None:
-                assert timeout != 0, "timeout while waiting for condition"
-                timeout -= 1
-
-    async def true_on_clk(self, clk: std.Clock, cond, *, timeout: int | None = None):
-        if clk.is_rising_edge():
-            await self.true_on_rising(clk.signal(), cond, timeout=timeout)
-        else:
-            await self.true_on_falling(clk.signal(), cond, timeout=timeout)
-
     #
     #
-
-    async def true_after_rising(
-        self, clk: ProxyPort, cond, *, timeout: int | None = None
-    ):
-        while True:
-            await self.rising_edge(clk)
-            await self.delta_step()
-
-            if cond():
-                return
-
-            if timeout is not None:
-                assert timeout != 0, "timeout while waiting for condition"
-                timeout -= 1
-
-    async def true_after_falling(
-        self, clk: ProxyPort, cond, *, timeout: int | None = None
-    ):
-        while True:
-            await self.falling_edge(clk)
-            await self.delta_step()
-
-            if cond():
-                return
-
-            if timeout is not None:
-                assert timeout != 0, "timeout while waiting for condition"
-                timeout -= 1
-
-    async def true_after_clk(self, clk: std.Clock, cond, *, timeout: int | None = None):
-        if clk.is_rising_edge():
-            await self.true_after_rising(clk.signal(), cond, timeout=timeout)
-        else:
-            await self.true_after_falling(clk.signal(), cond, timeout=timeout)
 
     async def start(self, coro, /):
         return Task(await cocotb.start(coro))
@@ -288,9 +193,10 @@ class Simulator:
             self._inout_ports = {}
 
             self._dut = dut
-            entity_name = self._entity.__name__
+            entity = self._params.entity
+            entity_name = entity.__name__
 
-            class EntityProxy(self._entity):
+            class EntityProxy(entity):
                 def __new__(cls):
                     return object.__new__(cls)
 
@@ -303,24 +209,26 @@ class Simulator:
                 def __repr__(self):
                     return entity_name
 
-            for name, port in self._entity._cohdl_info.ports.items():
+            for name, port in entity._cohdl_info.ports.items():
 
-                if self._port_bv is not None:
+                port_bv = self._params.cast_vectors
+
+                if port_bv is not None:
                     port_type = type(Port.decay(port))
 
                     if issubclass(port_type, BitVector) and not (
                         issubclass(port_type, (Signed, Unsigned))
                     ):
-                        if self._port_bv is Unsigned:
+                        if port_bv is Unsigned:
                             port = port.unsigned
-                        elif self._port_bv is Signed:
+                        elif port_bv is Signed:
                             port = port.signed
                         else:
                             raise AssertionError(
-                                f"invalid default vector port type {self._port_bv}"
+                                f"invalid default vector port type {port_bv}"
                             )
 
-                proxy = ProxyPort(port, getattr(dut, name))
+                proxy = ProxyPort(port, None, getattr(dut, name))
                 setattr(EntityProxy, name, proxy)
 
                 self._ports[name] = proxy
@@ -348,15 +256,3 @@ class Simulator:
 
     def release(self, port: ProxyPort, /):
         port.release()
-
-    def init_inputs(self, init_val=Null, /):
-        for port in self._input_ports.values():
-            port <<= init_val
-
-    def init_outputs(self, init_val=Null, /):
-        for port in self._output_ports.values():
-            port <<= init_val
-
-    def init_inouts(self, init_val=Null, /):
-        for port in self._inout_ports.values():
-            port <<= init_val

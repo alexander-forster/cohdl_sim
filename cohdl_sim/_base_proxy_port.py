@@ -1,4 +1,4 @@
-from cohdl import Bit, BitVector, Signed, Unsigned, Signal, Port, TypeQualifierBase
+from cohdl import BitVector, Signed, Unsigned, Signal, Port, TypeQualifierBase
 
 
 decay = TypeQualifierBase.decay
@@ -6,24 +6,19 @@ decay = TypeQualifierBase.decay
 
 def load_all(*args):
     for arg in args:
-        if isinstance(arg, _GenericProxyPort):
+        if isinstance(arg, _BaseProxyPort):
             arg._load()
 
 
-_prev_property = None
-
-
-class _GenericProxyPort(TypeQualifierBase):
+class _BaseProxyPort(TypeQualifierBase):
     def __init__(
         self,
         entity_port: Signal[BitVector],
         root=None,
-        uid: int | None = None,
     ):
         self._Wrapped = Port.decay(entity_port)
         self._type = type(self._Wrapped)
         self._root = self if root is None else root
-        self._uid = id(self) if uid is None else uid
 
     def decay(self):
         return Port.decay(self._Wrapped)
@@ -43,65 +38,59 @@ class _GenericProxyPort(TypeQualifierBase):
 
     @property
     def signed(self):
-        global _prev_property
         assert issubclass(self._type, BitVector)
 
         if issubclass(self._type, Signed):
-            _prev_property = self
             return self
 
-        result = _GenericProxyPort(self._Wrapped.signed, self._root, self._uid)
+        result = type(self)(self._Wrapped.signed, self._root)
+        result._tmp_signed_parent = self
         result._load = self._load
         result._store = self._store
-        _prev_property = result
         return result
 
     @signed.setter
     def signed(self, value):
         assert (
-            value._uid is self._uid
+            value is self or value._tmp_signed_parent is self
         ), "direct assignment to .signed property not allowed use '<<=' operator"
 
     @property
     def unsigned(self):
-        global _prev_property
         assert issubclass(self._type, BitVector)
 
         if issubclass(self._type, Unsigned):
-            _prev_property = self
             return self
 
-        result = _GenericProxyPort(self._Wrapped.unsigned, self._root, self._uid)
+        result = type(self)(self._Wrapped.unsigned, self._root)
+        result._tmp_unsigned_parent = self
         result._load = self._load
         result._store = self._store
-        _prev_property = result
         return result
 
     @unsigned.setter
     def unsigned(self, value):
         assert (
-            value._uid is self._uid
+            value is self or value._tmp_unsigned_parent is self
         ), "direct assignment to .unsigned property not allowed use '<<=' operator"
 
     @property
     def bitvector(self):
-        global _prev_property
         assert issubclass(self._type, BitVector)
 
         if not issubclass(self._type, (Signed, Unsigned)):
-            _prev_property = self
             return self
 
-        result = _GenericProxyPort(self._Wrapped.bitvector, self._root, self._uid)
+        result = type(self)(self._Wrapped.bitvector, self._root)
+        result._tmp_bitvector_parent
         result._load = self._load
         result._store = self._store
-        _prev_property = result
         return result
 
     @bitvector.setter
     def bitvector(self, value):
         assert (
-            value._uid is self._uid
+            value is self or value._tmp_bitvector_parent is self
         ), "direct assignment to .bitvector property not allowed use '<<=' operator"
 
     def __getitem__(self, arg):
@@ -111,10 +100,10 @@ class _GenericProxyPort(TypeQualifierBase):
             assert isinstance(arg.start, int)
             assert isinstance(arg.stop, int)
             assert arg.step is None
-            result = _GenericProxyPort(self._Wrapped[arg], self._root)
+            result = type(self)(self._Wrapped[arg], self._root)
         else:
             assert isinstance(arg, int)
-            result = _GenericProxyPort(self._Wrapped[arg], self._root)
+            result = type(self)(self._Wrapped[arg], self._root)
 
         # Replace load and store methods with version
         # of root object. They always update all bits of
@@ -128,7 +117,7 @@ class _GenericProxyPort(TypeQualifierBase):
         pass
 
     def __ilshift__(self, src):
-        if isinstance(src, _GenericProxyPort):
+        if isinstance(src, _BaseProxyPort):
             src = src._Wrapped
 
         self._Wrapped._assign(src)
@@ -254,12 +243,6 @@ class _GenericProxyPort(TypeQualifierBase):
     def __repr__(self):
         self._load()
         return repr(self._Wrapped)
-
-    def __await__(self):
-        async def gen():
-            return await self._root._sim.value_true(self)
-
-        return gen().__await__()
 
     #
     # abstract methods

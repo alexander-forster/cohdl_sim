@@ -1,52 +1,21 @@
-from cohdl import Bit, BitVector, Signed, Unsigned, Signal, Port, TypeQualifierBase
+from cohdl import Bit, BitVector, Signal
 
 from cocotb.handle import Freeze, Release
 from cocotb.triggers import RisingEdge, FallingEdge, Edge, ClockCycles
+from ._base_proxy_port import _BaseProxyPort
 
 
-def to_cocotb(cohdl_val):
-    if isinstance(cohdl_val, Bit):
-        return bool(cohdl_val)
-    return cohdl_val.unsigned.to_int()
-
-
-decay = TypeQualifierBase.decay
-
-
-def load_all(*args):
-    for arg in args:
-        if isinstance(arg, ProxyPort):
-            arg._load()
-
-
-_prev_property = None
-
-
-class ProxyPort(TypeQualifierBase):
+class ProxyPort(_BaseProxyPort):
     def __init__(
         self,
         entity_port: Signal[BitVector],
-        cocotb_port,
-        is_root=True,
-        uid: int | None = None,
+        root=None,
+        cocotb_port=None,
     ):
-        self._Wrapped = Port.decay(entity_port)
-        self._type = type(self._Wrapped)
-        self._root = is_root
-        self._uid = id(self) if uid is None else uid
+        super().__init__(entity_port, root)
+
+        # only set in root port
         self._cocotb_port = cocotb_port
-
-    def decay(self):
-        return Port.decay(self._Wrapped)
-
-    def __call__(self):
-        return self
-
-    def _is_root(self):
-        return self._root
-
-    def _to_type(self, inp):
-        return self._type(inp)
 
     def _load(self):
         val = self._cocotb_port.value
@@ -62,221 +31,6 @@ class ProxyPort(TypeQualifierBase):
         else:
             self._cocotb_port.value = self._Wrapped.unsigned.to_int()
 
-    def copy(self):
-        self._load()
-        return self._Wrapped.copy()
-
-    @property
-    def signed(self):
-        global _prev_property
-        assert issubclass(self._type, BitVector)
-
-        if issubclass(self._type, Signed):
-            _prev_property = self
-            return self
-
-        result = ProxyPort(self._Wrapped.signed, self._cocotb_port, False, self._uid)
-        result._load = self._load
-        result._store = self._store
-        _prev_property = result
-        return result
-
-    @signed.setter
-    def signed(self, value):
-        assert (
-            value._uid is self._uid
-        ), "direct assignment to .signed property not allowed use '<<=' operator"
-
-    @property
-    def unsigned(self):
-        global _prev_property
-        assert issubclass(self._type, BitVector)
-
-        if issubclass(self._type, Unsigned):
-            _prev_property = self
-            return self
-
-        result = ProxyPort(self._Wrapped.unsigned, self._cocotb_port, False, self._uid)
-        result._load = self._load
-        result._store = self._store
-        _prev_property = result
-        return result
-
-    @unsigned.setter
-    def unsigned(self, value):
-        assert (
-            value._uid is self._uid
-        ), "direct assignment to .unsigned property not allowed use '<<=' operator"
-
-    @property
-    def bitvector(self):
-        global _prev_property
-        assert issubclass(self._type, BitVector)
-
-        if not issubclass(self._type, (Signed, Unsigned)):
-            _prev_property = self
-            return self
-
-        result = ProxyPort(self._Wrapped.bitvector, self._cocotb_port, False, self._uid)
-        result._load = self._load
-        result._store = self._store
-        _prev_property = result
-        return result
-
-    @bitvector.setter
-    def bitvector(self, value):
-        assert (
-            value._uid is self._uid
-        ), "direct assignment to .bitvector property not allowed use '<<=' operator"
-
-    def __getitem__(self, arg):
-        assert issubclass(self._type, BitVector)
-
-        if isinstance(arg, slice):
-            assert isinstance(arg.start, int)
-            assert isinstance(arg.stop, int)
-            assert arg.step is None
-            result = ProxyPort(self._Wrapped[arg], self._cocotb_port, False)
-        else:
-            assert isinstance(arg, int)
-            result = ProxyPort(self._Wrapped[arg], self._cocotb_port, False)
-
-        # Replace load and store methods with version
-        # of root object. They always update all bits of
-        # a port even if they are accessed via a slice.
-        result._load = self._load
-        result._store = self._store
-
-        return result
-
-    def __setitem__(self, arg, value):
-        pass
-
-    def __ilshift__(self, src):
-        if isinstance(src, ProxyPort):
-            src = src._Wrapped
-
-        self._Wrapped._assign(src)
-        self._store()
-        return self
-
-    @property
-    def next(self):
-        raise AssertionError("reading from .next property not allowed")
-
-    @next.setter
-    def next(self, value):
-        self <<= value
-
-    @property
-    def type(self):
-        return self._type
-
-    def __bool__(self):
-        self._load()
-        return self._Wrapped.__bool__()
-
-    def __index__(self):
-        self._load()
-        return self._Wrapped.__index__()
-
-    def __eq__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__eq__(other)
-
-    def __gt__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__gt__(other)
-
-    def __lt__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__lt__(other)
-
-    def __ge__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__ge__(other)
-
-    def __invert__(self):
-        self._load()
-        return self._Wrapped.__invert__()
-
-    def __le__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__le__(other)
-
-    def __add__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__add__(other)
-
-    def __sub__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__sub__(other)
-
-    def __and__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__and__(other)
-
-    def __or__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__or__(other)
-
-    def __xor__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__xor__(other)
-
-    def __matmul__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__matmul__(other)
-
-    def __radd__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__radd__(other)
-
-    def __rsub__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__rsub__(other)
-
-    def __rand__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__rand__(other)
-
-    def __ror__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__ror__(other)
-
-    def __rxor__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__rxor__(other)
-
-    def __rmatmul__(self, other):
-        load_all(self, other)
-        other = decay(other)
-        return self._Wrapped.__rmatmul__(other)
-
-    def __str__(self):
-        self._load()
-        return str(self._Wrapped)
-
-    def __repr__(self):
-        self._load()
-        return repr(self._Wrapped)
-
     def freeze(self):
         assert (
             self._is_root()
@@ -290,7 +44,7 @@ class ProxyPort(TypeQualifierBase):
         self._cocotb_port.value = Release()
 
     async def _rising_edge(self):
-        if self._root:
+        if self._is_root():
             await RisingEdge(self._cocotb_port)
         else:
             self._load()
@@ -307,14 +61,14 @@ class ProxyPort(TypeQualifierBase):
                 prev = current
 
     async def _falling_edge(self):
-        if self._root:
+        if self._is_root():
             await FallingEdge(self._cocotb_port)
         else:
             self._load()
             prev = bool(self._Wrapped)
 
             while True:
-                await Edge(self._cocotb_port)
+                await Edge(self._root._cocotb_port)
 
                 self._load()
                 current = bool(self._Wrapped)
@@ -324,14 +78,14 @@ class ProxyPort(TypeQualifierBase):
                 prev = current
 
     async def _edge(self):
-        if self._root:
+        if self._is_root():
             await Edge(self._cocotb_port)
         else:
             self._load()
             prev = self._Wrapped.copy()
 
             while True:
-                await Edge(self._cocotb_port)
+                await Edge(self._root._cocotb_port)
 
                 self._load()
                 current = self._Wrapped.copy()
@@ -341,7 +95,7 @@ class ProxyPort(TypeQualifierBase):
                 prev = current
 
     async def _clock_cycles(self, num_cycles, rising=True):
-        if self._root:
+        if self._is_root():
             await ClockCycles(self._cocotb_port, num_cycles, rising)
         else:
             if rising:
@@ -359,6 +113,3 @@ class ProxyPort(TypeQualifierBase):
                 await self._edge()
 
         return gen().__await__()
-
-    def resize(self, *args, **kwargs):
-        return decay(self).resize(*args, **kwargs)

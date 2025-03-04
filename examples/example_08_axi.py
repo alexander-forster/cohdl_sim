@@ -1,18 +1,22 @@
 from __future__ import annotations
 
-from cohdl import Entity, Unsigned, Port, Bit, Null, BitVector, Signal
+from cohdl import Null, BitVector
 from cohdl import std
 
 from cohdl.std.axi.axi4_light import addr_map_entity
 from cohdl.std.reg import reg32
 
-from cohdl_sim import Simulator
 from cohdl_sim.axi.axi4_light import Axi4Light as AxiSim
 
 from typing import Self
 
-# alternative simulator, direct ghdl access without cocotb
-from cohdl_sim.ghdl_sim import Simulator
+from examples import _config
+
+if not _config.use_ghdl_direct():
+    from cohdl_sim import Simulator
+else:
+    # alternative simulator, direct ghdl access without cocotb
+    from cohdl_sim.ghdl_sim import Simulator
 
 
 class InverterReg(reg32.Register):

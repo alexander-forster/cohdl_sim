@@ -1,10 +1,13 @@
 from cohdl import Entity, Bit, Port
 from cohdl import std
 
-from cohdl_sim import Simulator
+from examples import _config
 
-# alternative simulator, direct ghdl access without cocotb
-# from cohdl_sim.ghdl_sim import Simulator
+if not _config.use_ghdl_direct():
+    from cohdl_sim import Simulator
+else:
+    # alternative simulator, direct ghdl access without cocotb
+    from cohdl_sim.ghdl_sim import Simulator
 
 
 class MyEntity(Entity):
@@ -46,7 +49,7 @@ async def testbench_1(entity: MyEntity):
     # output according to input
     await sim.delta_step()
 
-    assert entity.result == True
+    assert entity.result
 
 
 @sim.test
@@ -58,4 +61,4 @@ async def testbench_2(entity: MyEntity):
 
             await sim.delta_step()
 
-            assert entity.result == (a | b)
+            assert entity.result == Bit(a | b)

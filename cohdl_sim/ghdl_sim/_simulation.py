@@ -7,6 +7,7 @@ from pathlib import Path
 from functools import partial
 from ._build_simulation import prepare_ghdl_simulation
 from ._proxy_port import ProxyPort
+from .._base_simulation import _GenericParams, _BaseSimulator
 
 import os
 
@@ -41,7 +42,47 @@ class Task:
             await _suspend
 
 
-class Simulator:
+class Simulator(_BaseSimulator):
+
+    def _init_impl(self, p: _GenericParams):
+        from cohdl_sim._build_cache import write_cache_file, load_cache_file
+
+        assert (
+            p.simulator == "ghdl"
+        ), "cohdl_sim.ghdl_sim only supports the ghdl simulator"
+
+        assert (
+            p.sim_dir == p.vhdl_dir
+        ), "cohdl_sim.ghdl_sim requires `sim_dir` and `vhdl_dir` to be the same"
+
+        # ghdl_sim executes in the current context
+        # set extra-env locally
+        for name, val in p.extra_env.items():
+            os.environ[name] = val
+
+        top_name = p.entity._cohdl_info.name
+        self._entity = p.entity
+        self._top_name = top_name
+
+        if not p.use_build_cache:
+            lib = std.VhdlCompiler.to_vhdl_library(p.entity)
+            vhdl_sources = p.extra_vhdl_files + lib.write_dir(p.vhdl_dir)
+            write_cache_file(p.cache_file, p.entity, vhdl_sources=vhdl_sources)
+        else:
+            cache_content = load_cache_file(p.cache_file, p.entity)
+            vhdl_sources = cache_content.vhdl_sources
+
+        self._simlib = prepare_ghdl_simulation(
+            vhdl_sources, top_name, p.sim_dir, copy_files=False
+        )
+
+        self._sim = GhdlInterface()
+        self._sim_args = p.sim_args
+
+        self._tb = None
+        self._current_coro = None
+        self._port_bv = p.cast_vectors
+
     def __init__(
         self,
         entity: type[Entity],
@@ -51,61 +92,26 @@ class Simulator:
         sim_args: list[str] = None,
         sim_dir: str = "sim",
         vhdl_dir: str = "sim",
-        mkdir=True,
         cast_vectors=None,
         extra_env: dict[str, str] | None = None,
-        **kwargs,
+        extra_vhdl_files: list[str] = None,
+        use_build_cache: bool = False,
     ):
-        assert (
-            simulator == "ghdl"
-        ), "cohdl_sim.ghdl_sim only supports the ghdl simulator"
-
-        assert (
-            sim_dir == vhdl_dir,
-            "cohdl_sim.ghdl_sim requires `sim_dir` and `vhdl_dir` to be the same",
+        p = _GenericParams(
+            entity=entity,
+            build_dir=build_dir,
+            simulator=simulator,
+            sim_args=sim_args,
+            sim_dir=sim_dir,
+            vhdl_dir=vhdl_dir,
+            cast_vectors=cast_vectors,
+            extra_env=extra_env,
+            extra_vhdl_files=extra_vhdl_files,
+            use_build_cache=use_build_cache,
         )
 
-        # ghdl_sim executes in the current context
-        # set extra-env locally
-        if extra_env is not None:
-            for name, val in extra_env.items():
-                os.environ[name] = val
-
-        if len(kwargs) != 0:
-            print(f"ignoring additional arguments: {[*kwargs.keys()]}")
-
-        build_dir = Path(build_dir)
-        sim_dir = build_dir / sim_dir
-        vhdl_dir = build_dir / vhdl_dir
-
-        for dir in (build_dir, sim_dir, vhdl_dir):
-            if not os.path.exists(dir):
-                if mkdir:
-                    os.makedirs(dir, exist_ok=True)
-                else:
-                    raise AssertionError(f"target directory '{dir}' does not exist")
-
-        lib = std.VhdlCompiler.to_vhdl_library(entity)
-
-        top_name = lib.top_entity().name()
-
-        vhdl_sources = lib.write_dir(vhdl_dir)
-
-        self._entity = entity
-        self._simlib = prepare_ghdl_simulation(
-            vhdl_sources, top_name, sim_dir, copy_files=False
-        )
-
-        self._top_name = top_name
-        self._sim = GhdlInterface()
-        self._sim_args = sim_args if sim_args is not None else []
-
-        self._tb = None
-        self._current_coro = None
-        self._port_bv = cast_vectors
-
-    def port_names(self) -> list[str]:
-        return [name for name in self._entity._cohdl_info.ports]
+        super().__init__(p)
+        self._init_impl(p)
 
     def _initial_fn(self):
         self._input_ports = {}
@@ -144,7 +150,10 @@ class Simulator:
                         )
 
             proxy = ProxyPort(
-                port, self._sim.handle_by_name(f"{self._top_name}.{name}"), sim=self
+                port,
+                None,
+                ghdl_handle=self._sim.handle_by_name(f"{self._top_name}.{name}"),
+                sim=self,
             )
 
             setattr(EntityProxy, name, proxy)
@@ -206,7 +215,7 @@ class Simulator:
         ):
             await _suspend
 
-    async def rising_edge(self, signal: ProxyPort):
+    async def rising_edge(self, signal: ProxyPort, /):
         with self._sim.add_callback_value_change(
             signal._root._handle,
             partial(self._continue, self._current_coro, name="rising_edge"),
@@ -221,7 +230,7 @@ class Simulator:
                     return
                 prev_state = new_state
 
-    async def falling_edge(self, signal: ProxyPort):
+    async def falling_edge(self, signal: ProxyPort, /):
         with self._sim.add_callback_value_change(
             signal._root._handle,
             partial(self._continue, self._current_coro, name="falling_edge"),
@@ -236,7 +245,7 @@ class Simulator:
                     return
                 prev_state = new_state
 
-    async def any_edge(self, signal: ProxyPort):
+    async def any_edge(self, signal: ProxyPort, /):
         with self._sim.add_callback_value_change(
             signal._root._handle,
             partial(self._continue, self._current_coro, name="any_edge"),
@@ -251,20 +260,10 @@ class Simulator:
                     return
                 prev_state = new_state
 
-    async def clock_edge(self, clk: std.Clock, /):
-        Edge = std.Clock.Edge
-
-        match clk.edge():
-            case Edge.RISING:
-                await self.rising_edge(clk.signal())
-            case Edge.FALLING:
-                await self.falling_edge(clk.signal())
-            case Edge.BOTH:
-                await self.any_edge(clk.signal())
-            case _:
-                raise AssertionError(f"invalid clock edge {clk.edge()}")
-
     async def clock_cycles(self, signal: ProxyPort, num_cycles: int, rising=True):
+        if isinstance(signal, std.Clock):
+            signal = signal.signal()
+
         with self._sim.add_callback_value_change(
             signal._root._handle, partial(self._continue, self._current_coro)
         ):
@@ -313,28 +312,6 @@ class Simulator:
         ):
             while signal:
                 await _suspend
-
-    async def true_on_rising(self, clk: ProxyPort, cond, *, timeout: int | None = None):
-        while True:
-            await self.rising_edge(clk)
-            if cond():
-                return
-
-            if timeout is not None:
-                assert timeout != 0, "timeout while waiting for condition"
-                timeout -= 1
-
-    async def true_on_falling(
-        self, clk: ProxyPort, cond, *, timeout: int | None = None
-    ):
-        while True:
-            await self.falling_edge(clk)
-            if cond():
-                return
-
-            if timeout is not None:
-                assert timeout != 0, "timeout while waiting for condition"
-                timeout -= 1
 
     async def start(self, coro):
         task = self.start_soon(coro)
@@ -389,15 +366,3 @@ class Simulator:
                 await self._wait_picoseconds(half)
 
         self.start_soon(thread())
-
-    def init_inputs(self, init_val=Null, /):
-        for port in self._input_ports.values():
-            port <<= init_val
-
-    def init_outputs(self, init_val=Null, /):
-        for port in self._output_ports.values():
-            port <<= init_val
-
-    def init_inouts(self, init_val=Null, /):
-        for port in self._inout_ports.values():
-            port <<= init_val
