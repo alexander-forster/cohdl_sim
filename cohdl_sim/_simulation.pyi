@@ -11,6 +11,7 @@ class Simulator(_BaseSimulator):
         sim_dir: str = "sim",
         vhdl_dir: str = "vhdl",
         extra_vhdl_files: list[str] = None,
+        extra_vhdl_files_post: list[str] = None,
         cast_vectors=None,
         simulator: str = "ghdl",
         sim_args: list[str] | None = None,
@@ -26,6 +27,7 @@ class Simulator(_BaseSimulator):
         * `sim_dir` name of directory inside build_dir that is used for simulator output
         * `vhdl_dir` name of directory inside build_dir where generated VHDL files are written
         * `extra_vhdl_files` list of paths to additional VHDL files
+        * `extra_vhdl_files_post` like `extra_vhdl_files` but arguments are analyzed after CoHDL entities
         * `cast_vectors` when set to cohdl.Signed or cohdl.Unsigned all BitVector ports are converted
                             to the corresponding type
 

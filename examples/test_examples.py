@@ -57,3 +57,8 @@ class Tester(unittest.TestCase):
         from examples import example_08_axi
 
         repeat_with_ghdl_sim(example_08_axi)
+
+    def test_09(self):
+        from examples import example_09_nested_entities
+
+        repeat_with_ghdl_sim(example_09_nested_entities)

@@ -29,8 +29,6 @@ class Simulator(_BaseSimulator):
     def _init_impl(self, p: _GenericParams, cocotb_extra_args=None):
         from cohdl_sim._build_cache import write_cache_file, load_cache_file
 
-        vhdl_sources = p.extra_vhdl_files
-
         # This code is evaluated twice. Once in normal user code
         # to setup the test environment and again from another process
         # started by cocotb_simulator.run().
@@ -44,7 +42,11 @@ class Simulator(_BaseSimulator):
 
             if not p.use_build_cache:
                 lib = std.VhdlCompiler.to_vhdl_library(p.entity)
-                vhdl_sources += lib.write_dir(p.vhdl_dir)
+                vhdl_sources = (
+                    p.extra_vhdl_files
+                    + lib.write_dir(p.vhdl_dir)
+                    + p.extra_vhdl_files_post
+                )
 
                 write_cache_file(p.cache_file, p.entity, vhdl_sources=vhdl_sources)
             else:

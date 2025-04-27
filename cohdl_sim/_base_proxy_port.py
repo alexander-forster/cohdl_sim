@@ -118,6 +118,7 @@ class _BaseProxyPort(TypeQualifierBase):
 
     def __ilshift__(self, src):
         if isinstance(src, _BaseProxyPort):
+            src._load()
             src = src._Wrapped
 
         self._Wrapped._assign(src)

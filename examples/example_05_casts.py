@@ -1,4 +1,4 @@
-from cohdl import Entity, BitVector, Unsigned, Port, Null
+from cohdl import Entity, BitVector, Signed, Unsigned, Port, Null
 from cohdl import std
 
 from cohdl_sim import Simulator
@@ -45,6 +45,54 @@ async def testbench(entity: MyEntity):
         # properties of signals to cast between vector types
         assert entity.result_add.unsigned == 0
         assert entity.result_sub.unsigned == 0
+
+    entity.inp_a[0] <<= True
+
+    await sim.delta_step()
+
+    assert entity.result_add[0]
+    assert entity.result_sub[0]
+
+
+# The cast_vectors argument converts all BitVector ports
+# to Signed or Unsigned, can be useful to reduce number of
+# explicit casts in test code. Does not affect
+# ports that are already Signed or Unsigned.
+sim_unsigned = Simulator(MyEntity, cast_vectors=Unsigned)
+
+
+@sim_unsigned.test
+async def testbench_unsigned(entity: MyEntity):
+    entity.inp_a <<= 7
+    entity.inp_b <<= 10
+
+    await sim.delta_step()
+
+    for i in range(4):
+        assert entity.result_add == 1
+        assert entity.result_sub == 13
+
+    entity.inp_a[0] <<= True
+
+    await sim.delta_step()
+
+    assert entity.result_add[0]
+    assert entity.result_sub[0]
+
+
+sim_signed = Simulator(MyEntity, cast_vectors=Signed)
+
+
+@sim_signed.test
+async def testbench_signed(entity: MyEntity):
+    entity.inp_a <<= -3
+    entity.inp_b <<= 6
+
+    await sim.delta_step()
+
+    for i in range(4):
+        assert entity.result_add == 3
+        assert entity.result_sub == 7
 
     entity.inp_a[0] <<= True
 

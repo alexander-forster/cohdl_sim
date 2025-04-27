@@ -11,6 +11,7 @@ class Simulator(_BaseSimulator):
         sim_dir: str = "sim",
         vhdl_dir: str = "sim",
         extra_vhdl_files: list[str] = None,
+        extra_vhdl_files_post: list[str] = None,
         cast_vectors=None,
         simulator: str = "ghdl",
         sim_args: list[str] | None = None,

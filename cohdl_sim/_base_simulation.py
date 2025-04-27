@@ -28,6 +28,7 @@ class _GenericParams:
         cast_vectors=None,
         extra_env: dict[str, str] | None = None,
         extra_vhdl_files: list[str] = None,
+        extra_vhdl_files_post: list[str] = None,
         use_build_cache: bool = False,
     ):
         self.entity = entity
@@ -40,6 +41,9 @@ class _GenericParams:
         self.sim_args = [] if sim_args is None else sim_args
         self.extra_env = {} if extra_env is None else extra_env
         self.extra_vhdl_files = [] if extra_vhdl_files is None else extra_vhdl_files
+        self.extra_vhdl_files_post = (
+            [] if extra_vhdl_files_post is None else extra_vhdl_files_post
+        )
 
         self.cache_file = self.build_dir / ".build-cache.json"
 

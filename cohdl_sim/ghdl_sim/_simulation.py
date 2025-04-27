@@ -66,7 +66,9 @@ class Simulator(_BaseSimulator):
 
         if not p.use_build_cache:
             lib = std.VhdlCompiler.to_vhdl_library(p.entity)
-            vhdl_sources = p.extra_vhdl_files + lib.write_dir(p.vhdl_dir)
+            vhdl_sources = (
+                p.extra_vhdl_files + lib.write_dir(p.vhdl_dir) + p.extra_vhdl_files_post
+            )
             write_cache_file(p.cache_file, p.entity, vhdl_sources=vhdl_sources)
         else:
             cache_content = load_cache_file(p.cache_file, p.entity)
@@ -95,6 +97,7 @@ class Simulator(_BaseSimulator):
         cast_vectors=None,
         extra_env: dict[str, str] | None = None,
         extra_vhdl_files: list[str] = None,
+        extra_vhdl_files_post: list[str] = None,
         use_build_cache: bool = False,
     ):
         p = _GenericParams(
@@ -107,6 +110,7 @@ class Simulator(_BaseSimulator):
             cast_vectors=cast_vectors,
             extra_env=extra_env,
             extra_vhdl_files=extra_vhdl_files,
+            extra_vhdl_files_post=extra_vhdl_files_post,
             use_build_cache=use_build_cache,
         )
 
