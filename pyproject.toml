@@ -1,6 +1,6 @@
 [project]
 name="cohdl_sim"
-version="0.2.3"
+version="0.2.4"
 
 authors = [
     { name = "Alexander Forster", email = "alexander.forster123@gmail.com" }
@@ -8,7 +8,7 @@ authors = [
 
 description="Simulation support library for CoHDL, based on cocotb"
 readme = "README.md"
-requires-python = ">= 3.10"
+requires-python = ">= 3.11"
 
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -16,9 +16,9 @@ classifiers = [
 ]
 
 dependencies = [
-    "cohdl>=0.2.3",
-    "cocotb",
-    "cocotb_test",
+    "cohdl==0.2.4",
+    "cocotb==1.9.0",
+    "cocotb_test==0.2.5",
 ]
 
 [project.urls]
